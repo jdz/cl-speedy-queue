@@ -34,7 +34,8 @@
    :queue-empty-p
    :enqueue
    :force-enqueue
-   :dequeue))
+   :dequeue
+   :queue-contents))
 (cl:in-package #:cl-speedy-queue)
 
 ;;; The functions in this file are dangerous. Good compilers will generate code that will
@@ -254,3 +255,15 @@
   (declare (type speedy-queue queue)
            (optimize (speed 3) (safety 1)))
   (%dequeue queue))
+
+(defun queue-contents (queue)
+  (declare (type speedy-queue queue)
+           (optimize (speed 3) (safety 1)))
+  (unless (%queue-empty-p queue)
+    (let ((in (%queue-in queue))
+          (out (%queue-out queue))
+          (max (1- (length queue))))
+      (loop with i = out
+            collecting (svref queue i)
+            do (setf i (if (<= max i) 2 (1+ i)))
+            until (= i in)))))
