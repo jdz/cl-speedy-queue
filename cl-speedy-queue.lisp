@@ -32,6 +32,7 @@
    :queue-full-p
    :queue-empty-p
    :enqueue
+   :force-enqueue
    :dequeue))
 (cl:in-package #:cl-speedy-queue)
 
@@ -208,6 +209,18 @@
 (defun enqueue (object queue)
   "Enqueues OBJECT in QUEUE"
   (%enqueue object queue))
+
+(defun force-enqueue (object queue)
+  "Enqueues OBJECT in QUEUE.  If the QUEUE is full, drops the last element."
+  (declare (optimize (speed 3) (safety 1) (debug 0)))
+  (let* ((in (%queue-in queue))
+         (out (%queue-out queue))
+         (next (%next-index in (length queue))))
+    (when (and (= in out)
+               (not (eq (svref queue out) '#.queue-sentinel)))
+      (setf (svref queue 0) next))
+    (prog1 (setf (svref queue in) object)
+      (setf (svref queue 1) next))))
 
 (defun dequeue (queue)
   "Dequeues QUEUE"
