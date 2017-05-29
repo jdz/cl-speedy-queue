@@ -25,6 +25,7 @@
 (cl:defpackage #:cl-speedy-queue
   (:use :cl)
   (:export
+   :speedy-queue
    :make-queue
    :queue-count
    :queue-length
@@ -72,6 +73,9 @@
              (format s "Queue ~S is empty, and can't be dequeued anymore"
                      (queue-condition-queue c)))))
 
+(deftype speedy-queue ()
+  'simple-vector)
+
 (eval-when (:compile-toplevel)
   (defvar queue-sentinel (make-symbol "EMPTY")))
 
@@ -93,6 +97,7 @@
 
 (define-speedy-function %queue-length (queue)
   "Returns QUEUE's maximum length"
+  (declare (type speedy-queue queue))
   (the fixnum (- (length (the simple-vector queue)) 2)))
 
 (define-speedy-function queuep (x)
@@ -108,27 +113,33 @@
 
 (define-speedy-function %queue-out (queue)
   "QUEUE's exit pointer"
+  (declare (type speedy-queue queue))
   (the fixnum (svref queue 0)))
 
 (define-speedy-function %queue-in (queue)
   "QUEUE's entry pointer"
+  (declare (type speedy-queue queue))
   (the fixnum (svref queue 1)))
 
 (define-speedy-function %queue-peek (queue)
   "Dereference QUEUE's exit pointer"
+  (declare (type speedy-queue queue))
   (svref queue (%queue-out queue)))
 
 (define-speedy-function %queue-zero-p (queue)
   "Checks whether QUEUE's theoretical length is zero"
+  (declare (type speedy-queue queue))
   (= (the fixnum (%queue-in queue))
      (the fixnum (%queue-out queue))))
 
 (define-speedy-function %queue-empty-p (queue)
   "Checks whether QUEUE is effectively empty"
+  (declare (type speedy-queue queue))
   (eq (svref queue (%queue-out queue)) '#.queue-sentinel))
 
 (define-speedy-function %queue-full-p (queue)
   "Checks whether QUEUE is effectively full"
+  (declare (type speedy-queue queue))
   ;; We keep the exit reference around because we do two checks
   (let ((out (%queue-out queue)))
     (declare (fixnum out))
@@ -139,6 +150,7 @@
 
 (define-speedy-function %queue-count (queue)
   "Returns QUEUE's effective length"
+  (declare (type speedy-queue queue))
   ;; We start with the 'raw' length -- the difference between the pointers
   (let ((length (- (%queue-in queue) (%queue-out queue))))
     (declare (fixnum length))
@@ -157,6 +169,7 @@
     (if (= new-index queue-real-length) 2 new-index)))  ; Overflow to 2 if necessary
 
 (define-speedy-function %enqueue (object queue &aux (in (%queue-in queue)))
+  (declare (type speedy-queue queue))
   (declare (fixnum in))
   "Enqueue OBJECT and increment QUEUE's entry pointer"
   (if (or (not (= in (the fixnum (%queue-out queue))))
@@ -166,6 +179,7 @@
       (error 'queue-overflow-error :queue queue :item object)))
 
 (define-speedy-function %dequeue (queue &aux (out (%queue-out queue)))
+  (declare (type speedy-queue queue))
   (declare (fixnum out))
   "Sets QUEUE's tail to QUEUE, increments QUEUE's tail pointer, and returns the previous tail ref"
   (let ((out-object (svref queue out)))
@@ -185,14 +199,20 @@
 
 (defun queue-count (queue)
   "Returns the current size of QUEUE"
+  (declare (type speedy-queue queue)
+           (optimize (speed 3) (safety 1)))
   (%queue-count queue))
 
 (defun queue-length (queue)
   "Returns the maximum size of QUEUE"
+  (declare (type speedy-queue queue)
+           (optimize (speed 3) (safety 1)))
   (%queue-length queue))
 
 (defun queue-peek (queue)
   "Returns the next item that would be dequeued without dequeueing it."
+  (declare (type speedy-queue queue)
+           (optimize (speed 3) (safety 1)))
   (let ((peek (%queue-peek queue)))
     (if (eq peek '#.queue-sentinel)
         (values nil nil)
@@ -200,19 +220,26 @@
 
 (defun queue-full-p (queue)
   "Returns NIL if more items can be enqueued."
+  (declare (type speedy-queue queue)
+           (optimize (speed 3) (safety 1)))
   (%queue-full-p queue))
 
 (defun queue-empty-p (queue)
   "Tests whether QUEUE is empty"
+  (declare (type speedy-queue queue)
+           (optimize (speed 3) (safety 1)))
   (%queue-empty-p queue))
 
 (defun enqueue (object queue)
   "Enqueues OBJECT in QUEUE"
+  (declare (type speedy-queue queue)
+           (optimize (speed 3) (safety 1)))
   (%enqueue object queue))
 
 (defun force-enqueue (object queue)
   "Enqueues OBJECT in QUEUE.  If the QUEUE is full, drops the last element."
-  (declare (optimize (speed 3) (safety 1) (debug 0)))
+  (declare (type speedy-queue queue)
+           (optimize (speed 3) (safety 1)))
   (let* ((in (%queue-in queue))
          (out (%queue-out queue))
          (next (%next-index in (length queue))))
@@ -224,4 +251,6 @@
 
 (defun dequeue (queue)
   "Dequeues QUEUE"
+  (declare (type speedy-queue queue)
+           (optimize (speed 3) (safety 1)))
   (%dequeue queue))
